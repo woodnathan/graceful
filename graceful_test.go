@@ -101,7 +101,8 @@ func TestShutdown(t *testing.T) {
 
 		shutdown(&http.Server{}, log.New(&buf, "", 0))
 
-		want := fmt.Sprintf(ShutdownFormat+FinishedHTTP+FinishedFormat, Timeout, 15)
+		// Need to add newlines back in for output
+		want := fmt.Sprintf(ShutdownFormat+"\n"+FinishedHTTP+"\n"+FinishedFormat+"\n", Timeout, 15)
 
 		if got := buf.String(); got != want {
 			t.Fatalf("buf.String() = %q, want %q", got, want)

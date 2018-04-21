@@ -54,6 +54,7 @@ package graceful
 import (
 	"context"
 	"io/ioutil"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -82,7 +83,7 @@ type Shutdowner interface {
 
 // Logger is implemented by *log.Logger
 type Logger interface {
-	Printf(format string, v ...interface{})
+	Println(v ...interface{})
 	Fatal(...interface{})
 }
 
@@ -98,12 +99,12 @@ var Timeout = 15 * time.Second
 
 // Format strings used by the logger
 var (
-	ListeningFormat       = "Listening on http://%s\n"
-	ShutdownFormat        = "\nServer shutdown with timeout: %s\n"
-	ErrorFormat           = "Error: %v\n"
-	FinishedFormat        = "Shutdown finished %ds before deadline\n"
-	FinishedHTTP          = "Finished all in-flight HTTP requests\n"
-	HandlerShutdownFormat = "Shutting down handler with timeout: %ds\n"
+	ListeningFormat       = "Listening on http://%s"
+	ShutdownFormat        = "Server shutdown with timeout: %s"
+	ErrorFormat           = "Error: %v"
+	FinishedFormat        = "Shutdown finished %ds before deadline"
+	FinishedHTTP          = "Finished all in-flight HTTP requests"
+	HandlerShutdownFormat = "Shutting down handler with timeout: %ds"
 )
 
 // LogListenAndServe logs using the logger and then calls ListenAndServe
@@ -116,7 +117,8 @@ func LogListenAndServe(s Server, loggers ...Logger) {
 				host = net.IPv4zero.String()
 			}
 
-			logger.Printf(ListeningFormat, net.JoinHostPort(host, port))
+			logOutput := fmt.Sprintf(ListeningFormat, net.JoinHostPort(host, port))
+			logger.Println(logOutput)
 		}
 	}
 
@@ -169,25 +171,29 @@ func shutdown(s Shutdowner, logger Logger) {
 	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
 	defer cancel()
 
-	logger.Printf(ShutdownFormat, Timeout)
+	logOutput := fmt.Sprintf(ShutdownFormat, Timeout)
+	logger.Println(logOutput)
 
 	if err := s.Shutdown(ctx); err != nil {
-		logger.Printf(ErrorFormat, err)
+		logOutput := fmt.Sprintf(ErrorFormat, err)
+		logger.Println(logOutput)
 	} else {
 		if hs, ok := s.(*http.Server); ok {
-			logger.Printf(FinishedHTTP)
+			logger.Println(FinishedHTTP)
 
 			if hss, ok := hs.Handler.(Shutdowner); ok {
 				select {
 				case <-ctx.Done():
 					if err := ctx.Err(); err != nil {
-						logger.Printf(ErrorFormat, err)
+						logOutput := fmt.Sprintf(ErrorFormat, err)
+						logger.Println(logOutput)
 						return
 					}
 				default:
 					if deadline, ok := ctx.Deadline(); ok {
 						secs := (time.Until(deadline) + time.Second/2) / time.Second
-						logger.Printf(HandlerShutdownFormat, secs)
+						logOutput := fmt.Sprintf(HandlerShutdownFormat, secs)
+						logger.Println(logOutput)
 					}
 
 					done := make(chan error)
@@ -202,7 +208,8 @@ func shutdown(s Shutdowner, logger Logger) {
 					}()
 
 					if err := <-done; err != nil {
-						logger.Printf(ErrorFormat, err)
+						logOutput := fmt.Sprintf(ErrorFormat, err)
+						logger.Println(logOutput)
 						return
 					}
 				}
@@ -211,7 +218,8 @@ func shutdown(s Shutdowner, logger Logger) {
 
 		if deadline, ok := ctx.Deadline(); ok {
 			secs := (time.Until(deadline) + time.Second/2) / time.Second
-			logger.Printf(FinishedFormat, secs)
+			logOutput := fmt.Sprintf(FinishedFormat, secs)
+			logger.Println(logOutput)
 		}
 	}
 }
